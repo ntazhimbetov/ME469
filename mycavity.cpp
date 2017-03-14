@@ -2,7 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <vector>
 using namespace std;
+
+#include "CGSolver.hpp"
+#include "matvecops.hpp"
 
  // solve unsteady NS for a Boussinesq fluid in a heated cavity
  // structured grid/colocated discretization/dual time stepping
@@ -91,6 +95,128 @@ void tecplot(char filename[256]) { // write a tecplot ASCII file
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+double ConjugateGradient(double *x, double *b, double tol) { // Conjugate Gradient Ax = b solver for A symmetric
+  double resl = 0.0;
+  std::vector<int> row_idx;
+  std::vector<int> col_idx;
+  std::vector<double> vals;
+  std::vector<double> B;
+
+  std::vector<double> abs_res;
+  row_idx.push_back(0);
+  int index = 0;
+
+  for (int i = 2; i <= nx - 1; i++) {
+    for (int ij=li[i]+2; ij<=li[i]+ny-1; ij++) {
+      index += 1;
+      cout << index << ' ' << ij << endl;
+      // Constructing CSR for a CV with 4 neighbours
+      row_idx.push_back(5*index);
+      // Storing the location and value of north element
+      col_idx.push_back(ij+1);
+      vals.push_back(an[ij]);
+
+      // Storing the location and value of south element
+      col_idx.push_back(ij-1);
+      vals.push_back(as[ij]);
+        
+      // Storing the location and value of east element
+      col_idx.push_back(ij+ny);
+      vals.push_back(ae[ij]);
+        
+      // Storing the location and value of the west element
+      col_idx.push_back(ij-ny);
+      vals.push_back(aw[ij]);
+        
+      // Storing the location and value of current diagonal element
+      col_idx.push_back(ij);
+      vals.push_back(ap[ij]);
+
+      // Storing the values of b in B
+      B.push_back(b[ij]);
+    }
+  }
+
+  std::vector<double> X (x, x + (int) B.size());
+
+  CGSolver(vals, row_idx, col_idx, B, X, tol);
+
+  // Storing information back to x
+  x = &X[0];
+
+  std::vector<double> res;
+  res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
+  abs_res = ElementwiseAV(res);
+
+  for (int ind = 0; ind < (int) abs_res.size(); ind++)
+  {
+    resl += abs_res[ind];
+  }
+  // check convergence of inner iterations
+  return resl;
+}
+
+double BiConjugateGradient(double *x, double *b, double tol)
+{
+  double resl = 0.0;
+  std::vector<int> row_idx;
+  std::vector<int> col_idx;
+  std::vector<double> vals;
+  std::vector<double> B;
+
+  std::vector<double> abs_res;
+  row_idx.push_back(0);
+  int index = 0;
+
+  for (int i = 2; i <= nx - 1; i++) {
+    for (int ij=li[i]+2; ij<=li[i]+ny-1; ij++) {
+      index += 1;
+      // Constructing CSR for a CV with 4 neighbours
+      row_idx.push_back(5*index);
+      // Storing the location and value of north element
+      col_idx.push_back(ij+1);
+      vals.push_back(an[ij]);
+
+      // Storing the location and value of south element
+      col_idx.push_back(ij-1);
+      vals.push_back(as[ij]);
+        
+      // Storing the location and value of east element
+      col_idx.push_back(ij+ny);
+      vals.push_back(ae[ij]);
+        
+      // Storing the location and value of the west element
+      col_idx.push_back(ij-ny);
+      vals.push_back(aw[ij]);
+        
+      // Storing the location and value of current diagonal element
+      col_idx.push_back(ij);
+      vals.push_back(ap[ij]);
+
+      // Storing the values of b in B
+      B.push_back(b[ij]);
+    }
+  }
+
+  std::vector<double> X (x, x + (int) B.size());
+
+//  BCGSolver(vals, row_idx, col_idx, B, X, tol);
+  // Storing information back to x
+  x = &X[0];
+
+  std::vector<double> res;
+  res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
+  abs_res = ElementwiseAV(res);
+
+  for (int ind = 0; ind < (int) abs_res.size(); ind++)
+  {
+    resl += abs_res[ind];
+  }
+  // check convergence of inner iterations
+  return resl;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 double sipsol(int nsw, double *x, double *b, double tol) { // linear system solver Ax = b with A stored in terms of its diagonals...
   // temporary arrays
   double *un, *ue, *lw, *ls, *lpr, *res;
@@ -110,6 +236,7 @@ double sipsol(int nsw, double *x, double *b, double tol) { // linear system solv
        ue[ij]=(ae[ij]-p2)*lpr[ij];
     }
   }
+
   // inner iterations loop
   for (int l=1; l<=nsw; l++) {
     resl=0.;
@@ -476,7 +603,9 @@ double calcp() { // solve the pressure equation and update momentum
     }
   }
   //  solve the sytem
-  resp = sipsol(nsw, pp, su, tol);
+  // resp = sipsol(nsw, pp, su, tol);
+  //std::velocityctor<double> pp1;
+  resp = ConjugateGradient(pp, su, 0.00001);
 
   // extrapolate pp
   phibc(pp); // extrapolate the pressure at the boundaries

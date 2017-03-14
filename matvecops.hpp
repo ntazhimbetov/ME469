@@ -28,4 +28,6 @@ std::vector<double> CSR_mat_vec(std::vector<double> val,
 				std::vector<int>    col_idx,
 				std::vector<double> x);
 
+std::vector<double> ElementwiseAV(std::vector<double> x);
+
 #endif /* MATVECOPS_HPP */

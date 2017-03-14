@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "sparse.hpp"
-
 /* Function that implements the CG algorithm for a linear system
  *
  * Ax = b
@@ -17,11 +15,11 @@
  * tolerance, or -1 if the solver did not converge.
  */
 
-int CGSolver(SparseMatrix                  A,
-	     std::vector<double>          &b,
-             std::vector<double>          &x,
-             double                      tol,
-	     int                       colid,
-	     std::string         soln_prefix);
+int CGSolver(std::vector<double> &val,
+             std::vector<int>    &i_idx,
+             std::vector<int>    &j_idx,
+	         std::vector<double> &b,
+	         std::vector<double> &x,
+	         double              tol);
 
 #endif /* CGSOLVER_HPP */
