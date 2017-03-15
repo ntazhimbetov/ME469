@@ -100,53 +100,92 @@ double ConjugateGradient(double *x, double *b, double tol) { // Conjugate Gradie
   std::vector<int> row_idx;
   std::vector<int> col_idx;
   std::vector<double> vals;
-  std::vector<double> B;
-
-  std::vector<double> abs_res;
   row_idx.push_back(0);
   int index = 0;
 
-  for (int i = 2; i <= nx - 1; i++) {
-    for (int ij=li[i]+2; ij<=li[i]+ny-1; ij++) {
-      index += 1;
-      cout << index << ' ' << ij << endl;
-      // Constructing CSR for a CV with 4 neighbours
-      row_idx.push_back(5*index);
-      // Storing the location and value of north element
-      col_idx.push_back(ij+1);
-      vals.push_back(an[ij]);
+  std::vector<double> X;
+  std::vector<double> B;
 
-      // Storing the location and value of south element
-      col_idx.push_back(ij-1);
-      vals.push_back(as[ij]);
-        
-      // Storing the location and value of east element
-      col_idx.push_back(ij+ny);
-      vals.push_back(ae[ij]);
-        
-      // Storing the location and value of the west element
-      col_idx.push_back(ij-ny);
-      vals.push_back(aw[ij]);
-        
-      // Storing the location and value of current diagonal element
-      col_idx.push_back(ij);
-      vals.push_back(ap[ij]);
+  for (int i = 1; i <= nx*ny; i++)
+  {
+    X.push_back(x[i]);
+    B.push_back(b[i]);
+  }
 
-      // Storing the values of b in B
-      B.push_back(b[ij]);
+  int counter = 0;
+
+  // Left hand-side boundary conditions
+  for (int ij = 1; ij <= ny; ij++)
+  {
+    index += 1;
+    row_idx.push_back(index);
+    col_idx.push_back(index-1);
+    vals.push_back(1.0);
+    counter += 1;
+  }
+
+  // Inner elements of a matrix with top and bottom boundary conditions
+  for (int i = 2; i <= nx - 1; i++)
+  {
+    for (int ij = li[i]; ij <= li[i] + ny - 1; ij++)
+    {
+      if (ij < li[i] + 1 || ij > li[i] + ny - 2)
+      {
+        index += 1;
+        counter += 1;
+        row_idx.push_back(index);
+        col_idx.push_back(ij);
+        vals.push_back(1.0);
+      }
+      else {
+        index += 5;
+        counter += 1;
+
+        // Constructing CSR for a CV with 4 neighbours
+        row_idx.push_back(index);
+        // Storing the location and value of north element
+        col_idx.push_back(ij+1);
+        vals.push_back(an[ij+1]);
+
+        // Storing the location and value of south element
+        col_idx.push_back(ij-1);
+        vals.push_back(as[ij+1]);
+          
+        // Storing the location and value of east element
+        col_idx.push_back(ij+ny);
+        vals.push_back(ae[ij+1]);
+        
+        // Storing the location and value of the west element
+        col_idx.push_back(ij-ny);
+        vals.push_back(aw[ij+1]);
+        
+        // Storing the location and value of current diagonal element
+        col_idx.push_back(ij);
+        vals.push_back(ap[ij+1]);
+      }
     }
   }
 
-  std::vector<double> X (x, x + (int) B.size());
+  // Right hand-side boundary conditions
+  for (int ij = 1; ij <= ny; ij++)
+  {
+    index += 1;
+    row_idx.push_back(index);
+    col_idx.push_back(counter);
+    vals.push_back(1.0);
+    counter += 1;
+  }
 
   CGSolver(vals, row_idx, col_idx, B, X, tol);
 
   // Storing information back to x
-  x = &X[0];
+  for (int i = 0; i < (int) X.size(); i++)
+  {
+    x[i+1] = X[i];
+  }
 
-  std::vector<double> res;
-  res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
-  abs_res = ElementwiseAV(res);
+  std::vector<double> res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
+  std::vector<double> abs_res = ElementwiseAV(res);
 
   for (int ind = 0; ind < (int) abs_res.size(); ind++)
   {
@@ -155,58 +194,98 @@ double ConjugateGradient(double *x, double *b, double tol) { // Conjugate Gradie
   // check convergence of inner iterations
   return resl;
 }
-
-double BiConjugateGradient(double *x, double *b, double tol)
-{
+/*
+double BiConjugateGradient(double *x, double *b, double tol) {
   double resl = 0.0;
   std::vector<int> row_idx;
   std::vector<int> col_idx;
   std::vector<double> vals;
-  std::vector<double> B;
-
-  std::vector<double> abs_res;
   row_idx.push_back(0);
   int index = 0;
 
-  for (int i = 2; i <= nx - 1; i++) {
-    for (int ij=li[i]+2; ij<=li[i]+ny-1; ij++) {
-      index += 1;
-      // Constructing CSR for a CV with 4 neighbours
-      row_idx.push_back(5*index);
-      // Storing the location and value of north element
-      col_idx.push_back(ij+1);
-      vals.push_back(an[ij]);
+  std::vector<double> X;
+  std::vector<double> B;
 
-      // Storing the location and value of south element
-      col_idx.push_back(ij-1);
-      vals.push_back(as[ij]);
-        
-      // Storing the location and value of east element
-      col_idx.push_back(ij+ny);
-      vals.push_back(ae[ij]);
-        
-      // Storing the location and value of the west element
-      col_idx.push_back(ij-ny);
-      vals.push_back(aw[ij]);
-        
-      // Storing the location and value of current diagonal element
-      col_idx.push_back(ij);
-      vals.push_back(ap[ij]);
+  for (int i = 1; i <= nx*ny; i++)
+  {
+    X.push_back(x[i]);
+    B.push_back(b[i]);
+  }
 
-      // Storing the values of b in B
-      B.push_back(b[ij]);
+  int counter = 0;
+
+  // Left hand-side boundary conditions
+  for (int ij = 1; ij <= ny; ij++)
+  {
+    index += 1;
+    row_idx.push_back(index);
+    col_idx.push_back(index-1);
+    vals.push_back(1.0);
+    counter += 1;
+  }
+
+  // Inner elements of a matrix with top and bottom boundary conditions
+  for (int i = 2; i <= nx - 1; i++)
+  {
+    for (int ij = li[i]; ij <= li[i] + ny - 1; ij++)
+    {
+      if (ij < li[i] + 1 || ij > li[i] + ny - 2)
+      {
+        index += 1;
+        counter += 1;
+        row_idx.push_back(index);
+        col_idx.push_back(ij);
+        vals.push_back(1.0);
+      }
+      else {
+        index += 5;
+        counter += 1;
+
+        // Constructing CSR for a CV with 4 neighbours
+        row_idx.push_back(index);
+        // Storing the location and value of north element
+        col_idx.push_back(ij+1);
+        vals.push_back(an[ij+1]);
+
+        // Storing the location and value of south element
+        col_idx.push_back(ij-1);
+        vals.push_back(as[ij+1]);
+          
+        // Storing the location and value of east element
+        col_idx.push_back(ij+ny);
+        vals.push_back(ae[ij+1]);
+        
+        // Storing the location and value of the west element
+        col_idx.push_back(ij-ny);
+        vals.push_back(aw[ij+1]);
+        
+        // Storing the location and value of current diagonal element
+        col_idx.push_back(ij);
+        vals.push_back(ap[ij+1]);
+      }
     }
   }
 
-  std::vector<double> X (x, x + (int) B.size());
+  // Right hand-side boundary conditions
+  for (int ij = 1; ij <= ny; ij++)
+  {
+    index += 1;
+    row_idx.push_back(index);
+    col_idx.push_back(counter);
+    vals.push_back(1.0);
+    counter += 1;
+  }
 
-//  BCGSolver(vals, row_idx, col_idx, B, X, tol);
+  BCGSolver(vals, row_idx, col_idx, B, X, tol);
+
   // Storing information back to x
-  x = &X[0];
+  for (int i = 0; i < (int) X.size(); i++)
+  {
+    x[i+1] = X[i];
+  }
 
-  std::vector<double> res;
-  res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
-  abs_res = ElementwiseAV(res);
+  std::vector<double> res = vec_sub(B, CSR_mat_vec(vals, row_idx, col_idx, X));
+  std::vector<double> abs_res = ElementwiseAV(res);
 
   for (int ind = 0; ind < (int) abs_res.size(); ind++)
   {
@@ -215,6 +294,7 @@ double BiConjugateGradient(double *x, double *b, double tol)
   // check convergence of inner iterations
   return resl;
 }
+*/
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 double sipsol(int nsw, double *x, double *b, double tol) { // linear system solver Ax = b with A stored in terms of its diagonals...
@@ -243,6 +323,7 @@ double sipsol(int nsw, double *x, double *b, double tol) { // linear system solv
     // calculate residual and overwrite it by intermediate vector
     for (int i=2; i<=nx-1; i++) {
       for (int ij=li[i]+2; ij<=li[i]+ny-1; ij++) {
+        // cout << "Hello: " << ij << endl;
         res[ij]=b[ij]-an[ij]*x[ij+1]-as[ij]*x[ij-1]-ae[ij]*x[ij+ny]-aw[ij]*x[ij-ny]-ap[ij]*x[ij];
         resl=resl+fabs(res[ij]);
         res[ij]=(res[ij]-ls[ij]*res[ij-1]-lw[ij]*res[ij-ny])*lpr[ij];
@@ -602,10 +683,10 @@ double calcp() { // solve the pressure equation and update momentum
       pp[ij]=0.; 
     }
   }
-  //  solve the sytem
+  // solve the sytem
   // resp = sipsol(nsw, pp, su, tol);
-  //std::velocityctor<double> pp1;
-  resp = ConjugateGradient(pp, su, 0.00001);
+  // std::velocityctor<double> pp1;
+  resp = ConjugateGradient(pp, su, 0.0001);
 
   // extrapolate pp
   phibc(pp); // extrapolate the pressure at the boundaries
